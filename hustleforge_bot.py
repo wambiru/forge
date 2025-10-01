@@ -5,7 +5,7 @@ import google.generativeai as genai
 
 # Environment variables
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # Gemini API key
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 ENV = os.getenv('ENV', 'development')
 
 # Gemini setup
@@ -46,9 +46,12 @@ async def goals(update: Update, context):
         f"{user_data['skills']}, a budget of {user_data['budget']} KES, and goals of {user_data['goals']}."
     )
     try:
+        print(f"Sending prompt to Gemini: {prompt}")  # Log for Render
         response = model.generate_content(prompt)
+        print(f"Gemini response: {response.text}")  # Log for Render
         await update.message.reply_text(f"Here are your side hustle ideas:\n{response.text}")
     except Exception as e:
+        print(f"Gemini error: {str(e)}")  # Log for Render
         await update.message.reply_text(f"Error generating ideas: {str(e)}")
     return ConversationHandler.END
 
@@ -65,7 +68,6 @@ def main():
 
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    # Conversation handler for collecting user input
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
@@ -78,10 +80,4 @@ def main():
     )
 
     application.add_handler(conv_handler)
-
-    if ENV == 'development':
-        application.run_polling()
-    return application
-
-if __name__ == '__main__':
-    main()
+    return application  # Always return for webhooks
