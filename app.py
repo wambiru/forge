@@ -3,20 +3,19 @@ from telegram.ext import Application
 from fastapi import FastAPI, Request
 import logging
 
-# Set up logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-application = None  # Initialize globally
+application = None
 
 @app.on_event("startup")
 async def startup_event():
     global application
     try:
         logger.info("Initializing Telegram Application")
-        application = main()  # Create Application
-        await application.initialize()  # Initialize async components
+        application = main()
+        await application.initialize()
         logger.info("Telegram Application initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing application: {str(e)}", exc_info=True)
