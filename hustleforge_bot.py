@@ -1,67 +1,87 @@
 import os
-import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ConversationHandler,
-    ContextTypes,
-    filters,
-)
+from telegram.ext import Application, CommandHandler, ConversationHandler, MessageHandler, filters
+from telegram import Update
 import google.generativeai as genai
-from datetime import datetime
 
-# Logging setup
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# Configuration
+# Environment variables
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # Gemini key
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # Gemini API key
+ENV = os.getenv('ENV', 'development')
+
+# Gemini setup
 genai.configure(api_key=OPENAI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# ... (Your existing constants: KENYAN_DATA, RESOURCE_LINKS, etc.)
+# Conversation states
+SKILLS, LOCATION, BUDGET, GOALS = range(4)
 
-# ... (Your existing functions: start, collect_skills, collect_location, collect_budget, collect_goals, generate_hustle_ideas, etc.)
+async def start(update: Update, context):
+    """Handle the /start command."""
+    await update.message.reply_text(
+        "Welcome to HustleForge AI! I'm here to help you find side hustle ideas in Kenya.\n"
+        "What skills do you have? (e.g., cooking, phone repair, graphic design)"
+    )
+    return SKILLS
 
-async def webhook(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle incoming webhook updates"""
-    await application.process_update(update)
+async def skills(update: Update, context):
+    context.user_data['skills'] = update.message.text
+    await update.message.reply_text("Great! Where are you located? (e.g., Nairobi, Mombasa)")
+    return LOCATION
+
+async def location(update: Update, context):
+    context.user_data['location'] = update.message.text
+    await update.message.reply_text("What's your budget in KES? (e.g., 5000)")
+    return BUDGET
+
+async def budget(update: Update, context):
+    context.user_data['budget'] = update.message.text
+    await update.message.reply_text("What are your goals? (e.g., earn 20,000/month)")
+    return GOALS
+
+async def goals(update: Update, context):
+    context.user_data['goals'] = update.message.text
+    user_data = context.user_data
+    prompt = (
+        f"Generate side hustle ideas for someone in {user_data['location']} with skills in "
+        f"{user_data['skills']}, a budget of {user_data['budget']} KES, and goals of {user_data['goals']}."
+    )
+    try:
+        response = model.generate_content(prompt)
+        await update.message.reply_text(f"Here are your side hustle ideas:\n{response.text}")
+    except Exception as e:
+        await update.message.reply_text(f"Error generating ideas: {str(e)}")
+    return ConversationHandler.END
+
+async def cancel(update: Update, context):
+    await update.message.reply_text("Conversation cancelled.")
+    return ConversationHandler.END
 
 def main():
-    """Start the bot with webhook"""
-    global application
+    """Set up and return the Telegram bot application."""
+    if not TELEGRAM_TOKEN:
+        raise ValueError("TELEGRAM_BOT_TOKEN not set in environment variables")
+    if not OPENAI_API_KEY:
+        raise ValueError("OPENAI_API_KEY not set in environment variables")
+
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    # Conversation handler
+    # Conversation handler for collecting user input
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            SKILLS: [MessageHandler(filters.TEXT & ~filters.COMMAND, collect_skills)],
-            LOCATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, collect_location)],
-            BUDGET: [MessageHandler(filters.TEXT & ~filters.COMMAND, collect_budget)],
-            GOALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, collect_goals)],
-            MENU: [
-                CallbackQueryHandler(button_handler),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
-            ],
+            SKILLS: [MessageHandler(filters.TEXT & ~filters.COMMAND, skills)],
+            LOCATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, location)],
+            BUDGET: [MessageHandler(filters.TEXT & ~filters.COMMAND, budget)],
+            GOALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, goals)],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
     )
 
     application.add_handler(conv_handler)
-    application.add_handler(CommandHandler('help', help_command))
 
-    logger.info("HustleForge AI Bot is starting...")
+    if ENV == 'development':
+        application.run_polling()
     return application
 
 if __name__ == '__main__':
-    # For local testing, use polling
-    if os.getenv('ENV') == 'development':
-        main().run_polling(allowed_updates=Update.ALL_TYPES)
-    # For production, webhook setup is handled by Render
+    main()
