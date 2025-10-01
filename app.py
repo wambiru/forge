@@ -8,13 +8,19 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-try:
-    logger.info("Initializing Telegram Application")
-    application = main()
-    logger.info("FastAPI app initialized with Telegram Application")
-except Exception as e:
-    logger.error(f"Error initializing application: {str(e)}")
-    raise
+application = None  # Initialize globally
+
+@app.on_event("startup")
+async def startup_event():
+    global application
+    try:
+        logger.info("Initializing Telegram Application")
+        application = main()  # Create Application
+        await application.initialize()  # Initialize async components
+        logger.info("Telegram Application initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing application: {str(e)}", exc_info=True)
+        raise
 
 @app.get("/")
 async def root():
