@@ -3,5 +3,9 @@ __pycache__/
 .env
 *.log
 sales_tracker/
+<<<<<<< HEAD
 sales_tracker_ready/
 venv/
+=======
+sales_tracker_ready/
+>>>>>>> 20530eabdcfa35475f9cac732925d92320869426
