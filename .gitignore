@@ -1,0 +1,7 @@
+*.pyc
+__pycache__/
+.env
+*.log
+sales_tracker/
+sales_tracker_ready/
+venv/
