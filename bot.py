@@ -117,8 +117,16 @@ def handle_message(message):
     user_id = message.from_user.id
     logger.debug(f"Processing message from {user_id}: {message.text}")
     if user_id not in user_data or 'state' not in user_data[user_id]:
-        retry_send_message(bot.reply_to, message, "Please start with /start.")
-        return
+        if message.text.startswith('/'):
+            # Handle commands
+            return
+        else:
+            # Automatic welcome for first non-command message
+            keyboard = InlineKeyboardMarkup()
+            keyboard.add(InlineKeyboardButton("Start Now 🚀", callback_data="start_new"))
+            keyboard.add(InlineKeyboardButton("Learn More", callback_data="learn_more"))
+            retry_send_message(bot.reply_to, message, "Hey there! I’m HustleForge AI, your side hustle guru in Kenya! 😎 Ready to find ideas that match your skills?", reply_markup=keyboard)
+            return
 
     state = user_data[user_id]['state']
     try:
@@ -150,7 +158,6 @@ def handle_message(message):
             logger.info(f"Sending prompt to Gemini: {prompt}")
             response = model.generate_content(prompt)
             logger.info(f"Gemini response: {response.text}")
-            # Split the response into parts
             messages = split_message(f"Here are your side hustle ideas:\n{response.text}")
             for i, msg in enumerate(messages, 1):
                 retry_send_message(bot.reply_to, message, msg if i == 1 else f"Part {i}:\n{msg}")
@@ -158,6 +165,7 @@ def handle_message(message):
             # Add options for further questions and monetization
             keyboard = InlineKeyboardMarkup()
             keyboard.add(InlineKeyboardButton("Ask a Question", callback_data="ask_question"))
+            keyboard.add(InlineKeyboardButton("Get Summary (KES 100)", callback_data="premium_summary"))
             keyboard.add(InlineKeyboardButton("Get Full Strategy (KES 500)", callback_data="premium_strategy"))
             keyboard.add(InlineKeyboardButton("Start New", callback_data="start_new"))
             retry_send_message(bot.reply_to, message, "What next?", reply_markup=keyboard)
@@ -170,13 +178,19 @@ def handle_message(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     user_id = call.from_user.id
-    if call.data == "ask_question":
-        retry_send_message(bot.reply_to, call.message, "Sure! What question do you have about the ideas?")
-    elif call.data == "premium_strategy":
-        retry_send_message(bot.reply_to, call.message, "For a full strategy with human guidance, pay KES 500 via M-Pesa to [your M-Pesa number]. Send receipt to start.")
-    elif call.data == "start_new":
+    if call.data == "start_new":
         retry_send_message(bot.reply_to, call.message, "Starting new conversation...")
         start(call.message)
+    elif call.data == "learn_more":
+        retry_send_message(bot.reply_to, call.message, "Learn more about HustleForge AI at our website: https://www.linkedin.com/in/mwaura-wambiru/ (different tiers available!)")
+    elif call.data == "ask_question":
+        retry_send_message(bot.reply_to, call.message, "Sure! What question do you have about the ideas?")
+    elif call.data == "premium_summary":
+        retry_send_message(bot.reply_to, call.message, "For a summary report (KES 100), pay via M-Pesa to 0721-49-48-36. Send receipt to get a short PDF.")
+    elif call.data == "premium_strategy":
+        retry_send_message(bot.reply_to, call.message, "For a full strategy with human guidance (KES 500), pay via M-Pesa to 0721-49-48-36. Send receipt to start.")
+    else:
+        retry_send_message(bot.reply_to, call.message, "Sorry, something went wrong. Try again.")
 
 if __name__ == '__main__':
     logger.info("Starting bot in polling mode")
